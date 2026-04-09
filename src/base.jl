@@ -1856,29 +1856,80 @@ Return the compression settings used for system data such as time series arrays.
 get_compression_settings(sys::System) = IS.get_compression_settings(sys.data)
 
 """
-Return the initial times for all forecasts.
+Return the initial times for all forecasts, optionally filtered by `resolution` and/or
+`interval`.
 """
-get_forecast_initial_times(sys::System) = IS.get_forecast_initial_times(sys.data)
+function get_forecast_initial_times(
+    sys::System;
+    resolution::Union{Nothing, Dates.Period} = nothing,
+    interval::Union{Nothing, Dates.Period} = nothing,
+)
+    return IS.get_forecast_initial_times(
+        sys.data;
+        resolution = resolution,
+        interval = interval,
+    )
+end
 
 """
-Return the window count for all forecasts.
+Return the window count for all forecasts, optionally filtered by `resolution` and/or
+`interval`.
 """
-get_forecast_window_count(sys::System) = IS.get_forecast_window_count(sys.data)
+function get_forecast_window_count(
+    sys::System;
+    resolution::Union{Nothing, Dates.Period} = nothing,
+    interval::Union{Nothing, Dates.Period} = nothing,
+)
+    return IS.get_forecast_window_count(
+        sys.data;
+        resolution = resolution,
+        interval = interval,
+    )
+end
 
 """
-Return the horizon for all forecasts.
+Return the horizon for all forecasts, optionally filtered by `resolution` and/or
+`interval`.
 """
-get_forecast_horizon(sys::System) = IS.get_forecast_horizon(sys.data)
+function get_forecast_horizon(
+    sys::System;
+    resolution::Union{Nothing, Dates.Period} = nothing,
+    interval::Union{Nothing, Dates.Period} = nothing,
+)
+    return IS.get_forecast_horizon(sys.data; resolution = resolution, interval = interval)
+end
 
 """
-Return the initial_timestamp for all forecasts.
+Return the initial_timestamp for all forecasts, optionally filtered by `resolution`
+and/or `interval`.
 """
-get_forecast_initial_timestamp(sys::System) = IS.get_forecast_initial_timestamp(sys.data)
+function get_forecast_initial_timestamp(
+    sys::System;
+    resolution::Union{Nothing, Dates.Period} = nothing,
+    interval::Union{Nothing, Dates.Period} = nothing,
+)
+    return IS.get_forecast_initial_timestamp(
+        sys.data;
+        resolution = resolution,
+        interval = interval,
+    )
+end
 
 """
-Return the interval for all forecasts.
+Return the interval for all forecasts, optionally filtered by `resolution` and/or
+`interval`.
 """
-get_forecast_interval(sys::System) = IS.get_forecast_interval(sys.data)
+function get_forecast_interval(
+    sys::System;
+    resolution::Union{Nothing, Dates.Period} = nothing,
+    interval::Union{Nothing, Dates.Period} = nothing,
+)
+    return IS.get_forecast_interval(
+        sys.data;
+        resolution = resolution,
+        interval = interval,
+    )
+end
 
 """
 Return a sorted Vector of distinct resolutions for all time series of the given type
@@ -1902,6 +1953,8 @@ Call `collect` on the result to get an array.
 - `filter_func = nothing`: Only return time series for which this returns true.
 - `type = nothing`: Only return time series with this type.
 - `name = nothing`: Only return time series matching this value.
+- `resolution = nothing`: Only return time series matching this resolution.
+- `interval = nothing`: Only return time series matching this interval.
 
 # Examples
 ```julia
@@ -1917,8 +1970,24 @@ function IS.get_time_series_multiple(
     filter_func = nothing;
     type = nothing,
     name = nothing,
+    resolution = nothing,
+    interval = nothing,
 )
-    return get_time_series_multiple(sys.data, filter_func; type = type, name = name)
+    Channel() do channel
+        for component in
+            IS.iterate_components_with_time_series(sys.data; time_series_type = type)
+            for time_series in get_time_series_multiple(
+                component,
+                filter_func;
+                type = type,
+                name = name,
+                resolution = resolution,
+                interval = interval,
+            )
+                put!(channel, time_series)
+            end
+        end
+    end
 end
 
 """
@@ -1935,14 +2004,28 @@ end
 
 """
 Remove the time series data for a component or supplemental attribute and time series type.
+
+Use `resolution` and `interval` keyword arguments to disambiguate when multiple time series
+of the same type and name exist with different resolutions or intervals.
 """
 function remove_time_series!(
     sys::System,
     ::Type{T},
     owner::Union{Component, SupplementalAttribute},
-    name::String,
+    name::String;
+    resolution::Union{Nothing, Dates.Period} = nothing,
+    interval::Union{Nothing, Dates.Period} = nothing,
+    features...,
 ) where {T <: TimeSeriesData}
-    return IS.remove_time_series!(sys.data, T, owner, name)
+    return IS.remove_time_series!(
+        sys.data,
+        T,
+        owner,
+        name;
+        resolution = resolution,
+        interval = interval,
+        features...,
+    )
 end
 
 """
@@ -1956,8 +2039,13 @@ most time series instances then consider using `clear_time_series!`. It
 will delete the HDF5 file and create a new one. PowerSystems has plans to
 automate this type of workflow.
 """
-function remove_time_series!(sys::System, ::Type{T}) where {T <: TimeSeriesData}
-    return IS.remove_time_series!(sys.data, T)
+function remove_time_series!(
+    sys::System,
+    ::Type{T};
+    resolution::Union{Nothing, Dates.Period} = nothing,
+    interval::Union{Nothing, Dates.Period} = nothing,
+) where {T <: TimeSeriesData}
+    return IS.remove_time_series!(sys.data, T; resolution = resolution, interval = interval)
 end
 
 """
